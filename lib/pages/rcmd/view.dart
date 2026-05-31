@@ -33,6 +33,7 @@ class _RcmdPageState extends State<RcmdPage>
       margin: const .symmetric(horizontal: Style.safeSpace),
       decoration: const BoxDecoration(borderRadius: Style.mdRadius),
       child: refreshIndicator(
+        key: controller.refreshIndicatorKey,
         onRefresh: controller.onRefresh,
         child: CustomScrollView(
           controller: controller.scrollController,
@@ -73,14 +74,12 @@ class _RcmdPageState extends State<RcmdPage>
                     controller.onLoadMore();
                   }
                   if (controller.lastRefreshAt != null) {
-                    if (controller.lastRefreshAt == index) {
-                      return GestureDetector(
-                        onTap: () => controller
-                          ..animateToTop()
-                          ..onRefresh(),
-                        child: Card(
-                          child: Container(
-                            alignment: Alignment.center,
+                      if (controller.lastRefreshAt == index) {
+                        return GestureDetector(
+                          onTap: controller.scrollToTopAndRefresh,
+                          child: Card(
+                            child: Container(
+                              alignment: Alignment.center,
                             padding: const .symmetric(horizontal: 10),
                             child: Text(
                               '上次看到这里\n点击刷新',

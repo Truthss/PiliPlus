@@ -1,11 +1,17 @@
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
+import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
+import 'package:flutter/material.dart' show GlobalKey;
 
 class RcmdController extends CommonListController {
   late bool enableSaveLastData = Pref.enableSaveLastData;
   final bool appRcmd = Pref.appRcmd;
+  final GlobalKey<RefreshIndicatorState> refreshIndicatorKey =
+      GlobalKey<RefreshIndicatorState>();
+  bool _isRefreshingInternal = false;
 
   int? lastRefreshAt;
   late bool savedRcmdTip = Pref.savedRcmdTip;
@@ -55,5 +61,18 @@ class RcmdController extends CommonListController {
     page = 0;
     isEnd = false;
     return queryData();
+  }
+
+  Future<void> scrollToTopAndRefresh() async {
+    if (_isRefreshingInternal) {
+      return;
+    }
+    _isRefreshingInternal = true;
+    try {
+      await scrollController.animToTop();
+      await refreshIndicatorKey.currentState?.show();
+    } finally {
+      _isRefreshingInternal = false;
+    }
   }
 }
