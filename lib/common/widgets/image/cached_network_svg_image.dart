@@ -2,10 +2,10 @@
 
 import 'dart:developer';
 
+import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class CachedNetworkSVGImage extends StatefulWidget {
@@ -27,9 +27,7 @@ class CachedNetworkSVGImage extends StatefulWidget {
     this._theme = const SvgTheme(),
     this._colorFilter,
     this._placeholderBuilder,
-    BaseCacheManager? cacheManager,
-  }) : _cacheManager = cacheManager ?? DefaultCacheManager(),
-       super(key: key ?? ValueKey(_cacheKey ?? _url));
+  }) : super(key: key ?? ValueKey(_cacheKey ?? _url));
 
   final String _url;
   final String? _cacheKey;
@@ -47,7 +45,6 @@ class CachedNetworkSVGImage extends StatefulWidget {
   final SvgTheme _theme;
   final ColorFilter? _colorFilter;
   final WidgetBuilder? _placeholderBuilder;
-  final BaseCacheManager _cacheManager;
 
   @override
   State<CachedNetworkSVGImage> createState() => _CachedNetworkSVGImageState();
@@ -63,9 +60,7 @@ class _CachedNetworkSVGImageState extends State<CachedNetworkSVGImage> {
   double? height;
   late TextScaler textScaler;
 
-  static final _sizeRegExp = RegExp(
-    r'height="([\d\.]+)([c-x]{2})?"',
-  );
+  static final _sizeRegExp = RegExp(r'height="([\d\.]+)([c-x]{2})?"');
 
   @override
   void initState() {
@@ -84,7 +79,7 @@ class _CachedNetworkSVGImageState extends State<CachedNetworkSVGImage> {
 
   Future<void> _loadImage() async {
     try {
-      final file = await widget._cacheManager.getSingleFile(
+      final file = await CacheManager.manager.getSingleFile(
         widget._url,
         key: _cacheKey,
         headers: widget._headers ?? const {},

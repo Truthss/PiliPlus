@@ -7,6 +7,7 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
+import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
 import 'package:PiliPlus/common/widgets/marquee.dart';
 import 'package:PiliPlus/http/danmaku.dart';
 import 'package:PiliPlus/http/danmaku_block.dart';
@@ -23,6 +24,8 @@ import 'package:PiliPlus/models/video/play/url.dart';
 import 'package:PiliPlus/models_new/video/video_play_info/subtitle.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
+import 'package:PiliPlus/pages/setting/models/play_settings.dart'
+    show showPlayerVolumeDialog;
 import 'package:PiliPlus/pages/setting/widgets/popup_item.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -66,6 +69,7 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:media_kit/media_kit.dart' show NativePlayer;
 
 mixin TimeBatteryMixin<T extends StatefulWidget> on State<T> {
   PlPlayerController get plPlayerController;
@@ -446,10 +450,7 @@ class HeaderControlState extends State<HeaderControl>
                     dense: true,
                     onTap: () {
                       Get.back();
-                      videoDetailCtr.queryVideoUrl(
-                        defaultST: videoDetailCtr.playedTime,
-                        fromReset: true,
-                      );
+                      videoDetailCtr.queryVideoUrl(fromReset: true);
                     },
                     leading: const Icon(Icons.refresh_outlined, size: 20),
                     title: const Text('重载视频', style: titleStyle),
@@ -476,6 +477,24 @@ class HeaderControlState extends State<HeaderControl>
                   descFontSize: 12,
                   descPosType: .subtitle,
                 ),
+                if (PlatformUtils.isMobile)
+                  if (plPlayerController.videoPlayerController
+                      case final player?)
+                    Builder(
+                      builder: (context) => ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.volume_up, size: 20),
+                        title: const Text('播放器音量'),
+                        subtitle: Text(
+                          '当前: ${Pref.playerVolume.toStringAsFixed(0)}%',
+                        ),
+                        onTap: () => showPlayerVolumeDialog(
+                          context,
+                          () => (context as Element).markNeedsBuild(),
+                          onChanged: player.setVolume,
+                        ),
+                      ),
+                    ),
                 if (!isFileSource)
                   ListTile(
                     dense: true,
@@ -497,10 +516,7 @@ class HeaderControlState extends State<HeaderControl>
                         VideoUtils.cdnService = result;
                         setting.put(SettingBoxKey.CDNService, result.name);
                         SmartDialog.showToast('已设置为 ${result.desc}，正在重载视频');
-                        videoDetailCtr.queryVideoUrl(
-                          defaultST: videoDetailCtr.playedTime,
-                          fromReset: true,
-                        );
+                        videoDetailCtr.queryVideoUrl(fromReset: true);
                       }
                     },
                   ),
@@ -729,15 +745,13 @@ class HeaderControlState extends State<HeaderControl>
                     leading: const Icon(Icons.download_outlined, size: 20),
                     title: const Text('保存字幕', style: titleStyle),
                   ),
-                ListTile(
-                  dense: true,
-                  title: const Text('播放信息', style: titleStyle),
-                  leading: const Icon(Icons.info_outline, size: 20),
-                  onTap: () => showPlayerInfo(
-                    context,
-                    plPlayerController: plPlayerController,
+                if (plPlayerController.videoPlayerController case final player?)
+                  ListTile(
+                    dense: true,
+                    title: const Text('播放信息', style: titleStyle),
+                    leading: const Icon(Icons.info_outline, size: 20),
+                    onTap: () => showPlayerInfo(context, player: player),
                   ),
-                ),
                 ListTile(
                   dense: true,
                   onTap: () {
@@ -761,14 +775,10 @@ class HeaderControlState extends State<HeaderControl>
 
   static void showPlayerInfo(
     BuildContext context, {
-    required PlPlayerController plPlayerController,
+    required NativePlayer player,
   }) {
-    final player = plPlayerController.videoPlayerController;
-    if (player == null) {
-      SmartDialog.showToast('播放器未初始化');
-      return;
-    }
     final hwdec = player.getProperty('hwdec-current');
+    final volume = player.getProperty('volume').subLength(3);
     showDialog(
       context: context,
       builder: (context) {
@@ -780,18 +790,14 @@ class HeaderControlState extends State<HeaderControl>
           content: Material(
             type: MaterialType.transparency,
             child: ListTileTheme(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-              ),
+              contentPadding: const .symmetric(horizontal: 24),
               child: SingleChildScrollView(
                 child: Column(
                   children: [
                     ListTile(
                       dense: true,
                       title: const Text("Resolution"),
-                      subtitle: Text(
-                        '${state.width}x${state.height}',
-                      ),
+                      subtitle: Text('${state.width}x${state.height}'),
                       onTap: () => Utils.copyText(
                         'Resolution\n${state.width}x${state.height}',
                       ),
@@ -799,60 +805,36 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("VideoParams"),
-                      subtitle: Text(
-                        state.videoParams.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoParams\n${state.videoParams}',
-                      ),
+                      subtitle: Text(state.videoParams.toString()),
+                      onTap: () =>
+                          Utils.copyText('VideoParams\n${state.videoParams}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("AudioParams"),
-                      subtitle: Text(
-                        state.audioParams.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioParams\n${state.audioParams}',
-                      ),
+                      subtitle: Text(state.audioParams.toString()),
+                      onTap: () =>
+                          Utils.copyText('AudioParams\n${state.audioParams}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("Media"),
-                      subtitle: Text(
-                        state.playlist.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Media\n${state.playlist}',
-                      ),
+                      subtitle: Text(state.playlist.toString()),
+                      onTap: () => Utils.copyText('Media\n${state.playlist}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("AudioTrack"),
-                      subtitle: Text(
-                        state.track.audio.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'AudioTrack\n${state.track.audio}',
-                      ),
+                      subtitle: Text(state.track.audio.toString()),
+                      onTap: () =>
+                          Utils.copyText('AudioTrack\n${state.track.audio}'),
                     ),
                     ListTile(
                       dense: true,
                       title: const Text("VideoTrack"),
-                      subtitle: Text(
-                        state.track.video.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'VideoTrack\n${state.track.audio}',
-                      ),
-                    ),
-                    ListTile(
-                      dense: true,
-                      title: const Text("pitch"),
-                      subtitle: Text(state.pitch.toString()),
-                      onTap: () => Utils.copyText(
-                        'pitch\n${state.pitch}',
-                      ),
+                      subtitle: Text(state.track.video.toString()),
+                      onTap: () =>
+                          Utils.copyText('VideoTrack\n${state.track.audio}'),
                     ),
                     ListTile(
                       dense: true,
@@ -863,12 +845,8 @@ class HeaderControlState extends State<HeaderControl>
                     ListTile(
                       dense: true,
                       title: const Text("Volume"),
-                      subtitle: Text(
-                        state.volume.toString(),
-                      ),
-                      onTap: () => Utils.copyText(
-                        'Volume\n${state.volume}',
-                      ),
+                      subtitle: Text(volume.toString()),
+                      onTap: () => Utils.copyText('Volume\n$volume'),
                     ),
                     ListTile(
                       dense: true,
@@ -1092,28 +1070,26 @@ class HeaderControlState extends State<HeaderControl>
 
   // 选择解码格式
   void showSetDecodeFormats() {
-    final VideoItem firstVideo = videoDetailCtr.firstVideo;
+    final firstCode = videoDetailCtr.firstVideo.quality.code;
     // 当前视频可用的解码格式
-    final List<FormatItem> videoFormat = videoInfo.supportFormats!;
-    final List<String>? list = videoFormat
-        .firstWhere((FormatItem e) => e.quality == firstVideo.quality.code)
-        .codecs;
+    final videoFormat = videoInfo.supportFormats!;
+
+    final list = videoFormat.firstWhere((e) => e.quality == firstCode).codecs;
     if (list == null) {
       SmartDialog.showToast('当前视频不支持选择解码格式');
       return;
     }
 
     // 当前选中的解码格式
-    final VideoDecodeFormatType currentDecodeFormats =
-        videoDetailCtr.currentDecodeFormats;
+    final curCodecs = videoDetailCtr.currentDecodeFormats.codes;
     showBottomSheet(
       (context, setState) {
-        final theme = Theme.of(context);
+        final colorScheme = ColorScheme.of(context);
         return Padding(
           padding: const EdgeInsets.all(12),
           child: Material(
             clipBehavior: Clip.hardEdge,
-            color: theme.colorScheme.surface,
+            color: colorScheme.surface,
             borderRadius: const BorderRadius.all(Radius.circular(12)),
             child: Column(
               children: [
@@ -1131,30 +1107,22 @@ class HeaderControlState extends State<HeaderControl>
                         itemBuilder: (context, index) {
                           final item = list[index];
                           final format = VideoDecodeFormatType.fromString(item);
-                          final isCurr = currentDecodeFormats.codes.any(
-                            item.startsWith,
-                          );
+                          final isCurr = curCodecs.any(item.startsWith);
                           return ListTile(
                             dense: true,
                             onTap: () {
-                              if (isCurr) {
-                                return;
-                              }
+                              if (isCurr) return;
                               Get.back();
                               videoDetailCtr
                                 ..currentDecodeFormats = format
                                 ..updatePlayer();
+                              SmartDialog.showToast("解码已变为：${format.name}");
                             },
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                            ),
+                            contentPadding: const .symmetric(horizontal: 20),
                             title: Text(format.description),
                             subtitle: Text(item, style: subTitleStyle),
                             trailing: isCurr
-                                ? Icon(
-                                    Icons.done,
-                                    color: theme.colorScheme.primary,
-                                  )
+                                ? Icon(Icons.done, color: colorScheme.primary)
                                 : null,
                           );
                         },
@@ -1170,69 +1138,100 @@ class HeaderControlState extends State<HeaderControl>
     );
   }
 
+  Future<_SubtitleFormat?> _showFormatDialog() {
+    return showDialog<_SubtitleFormat>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('选择格式'),
+        children: [
+          DialogOption(
+            onPressed: () => Get.back(result: _SubtitleFormat.json),
+            child: const Text('JSON'),
+          ),
+          DialogOption(
+            onPressed: () => Get.back(result: _SubtitleFormat.vtt),
+            child: const Text('WEBVTT'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void onExportSubtitle() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        clipBehavior: Clip.hardEdge,
-        contentPadding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
-        title: const Text('保存字幕'),
-        content: SingleChildScrollView(
-          child: Column(
-            children: videoDetailCtr.subtitles
-                .map(
-                  (item) => ListTile(
-                    dense: true,
-                    onTap: () async {
-                      Get.back();
-                      final url = item.subtitleUrl;
-                      if (url == null || url.isEmpty) return;
-                      try {
-                        final res = await Request.dio.get<Uint8List>(
-                          url.http2https,
-                          options: Options(
-                            responseType: ResponseType.bytes,
-                            headers: Constants.baseHeaders,
-                            extra: {'account': const NoAccount()},
-                          ),
+      builder: (context) {
+        final subtitles = videoDetailCtr.subtitles;
+        return SimpleDialog(
+          clipBehavior: Clip.hardEdge,
+          contentPadding: const .only(bottom: 12),
+          titlePadding: const .fromLTRB(20, 20, 20, 12),
+          title: const Text('保存字幕'),
+          children: List.generate(subtitles.length, (i) {
+            final item = subtitles[i];
+            return DialogOption(
+              onPressed: () async {
+                Get.back();
+                final url = item.subtitleUrl;
+                if (url == null || url.isEmpty) return;
+                final format = await _showFormatDialog();
+                if (format == null) return;
+                try {
+                  final Uint8List bytes;
+                  switch (format) {
+                    case .vtt:
+                      var subtitle = videoDetailCtr.vttSubtitles[i];
+                      if (subtitle == null) {
+                        final res = await VideoHttp.vttSubtitles(
+                          item.subtitleUrl!,
                         );
-                        if (res.statusCode == 200) {
-                          final bytes = Uint8List.fromList(
-                            Request.responseBytesDecoder(
-                              res.data!,
-                              res.headers.map,
-                            ),
-                          );
-                          String name =
-                              '${introController.videoDetail.value.title}-${videoDetailCtr.bvid}-${videoDetailCtr.cid.value}-${item.lanDoc}.json';
-                          if (Platform.isWindows) {
-                            // Reserved characters may not be used in file names. See: https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
-                            name = name.replaceAll(
-                              RegExp(r'[<>:/\\|?*"]'),
-                              '',
-                            );
-                          }
-                          StorageUtils.saveBytes2File(
-                            name: name,
-                            bytes: bytes,
-                            allowedExtensions: const ['json'],
-                          );
-                        }
-                      } catch (e, s) {
-                        Utils.reportError(e, s);
-                        SmartDialog.showToast(e.toString());
+                        if (res == null) return;
+                        subtitle = (isData: true, id: res);
+                        videoDetailCtr.vttSubtitles[i] = subtitle;
                       }
-                    },
-                    title: Text(
-                      item.lanDoc!,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-      ),
+                      bytes = utf8.encode(subtitle.id);
+                    case .json:
+                      final res = await Request.dio.get<Uint8List>(
+                        url.http2https,
+                        options: Options(
+                          responseType: ResponseType.bytes,
+                          headers: Constants.baseHeaders,
+                          extra: {'account': const NoAccount()},
+                        ),
+                      );
+                      if (res.statusCode != 200) return;
+                      bytes = Uint8List.fromList(
+                        Request.responseBytesDecoder(
+                          res.data!,
+                          res.headers.map,
+                        ),
+                      );
+                  }
+                  String name =
+                      '${introController.videoDetail.value.title}-${videoDetailCtr.bvid}-${videoDetailCtr.cid.value}-${item.lanDoc}.${format.name}';
+                  // Reserved characters may not be used in file names. See: https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#naming-conventions
+                  name = name.replaceAll(
+                    Platform.isWindows ? RegExp(r'[<>:/\\|?*"]') : '/',
+                    '_',
+                  );
+                  StorageUtils.saveBytes2File(
+                    name: name,
+                    bytes: bytes,
+                    allowedExtensions: [format.name],
+                  );
+                } catch (e, s) {
+                  Utils.reportError(e, s);
+                  SmartDialog.showToast(e.toString());
+                }
+              },
+              child: Text(
+                item.lanDoc ?? item.lan,
+                style: const TextStyle(fontSize: 14),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 
@@ -1247,7 +1246,7 @@ class HeaderControlState extends State<HeaderControl>
   /// 字幕设置
   void showSetSubtitle() {
     showBottomSheet(
-      padding: isFullScreen ? 70 : null,
+      padding: () => isFullScreen ? const .only(bottom: 70) : .zero,
       (context, setState) {
         final theme = Theme.of(context);
 
@@ -1989,9 +1988,7 @@ class HeaderControlState extends State<HeaderControl>
                         FontAwesomeIcons.thumbsUp,
                         color: Colors.white,
                       ),
-                      selectIcon: const Icon(
-                        FontAwesomeIcons.solidThumbsUp,
-                      ),
+                      selectIcon: const Icon(FontAwesomeIcons.solidThumbsUp),
                       selectStatus: introController.hasLike.value,
                       semanticsLabel: '点赞',
                       animation: introController.tripleAnimation,
@@ -2088,3 +2085,5 @@ class HeaderControlState extends State<HeaderControl>
     );
   }
 }
+
+enum _SubtitleFormat { json, vtt }

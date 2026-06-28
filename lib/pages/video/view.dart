@@ -12,6 +12,7 @@ import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_pinned_dynamic_header.dart';
+import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
@@ -51,7 +52,6 @@ import 'package:PiliPlus/services/shutdown_timer_service.dart'
     show shutdownTimerService;
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
-import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
@@ -79,11 +79,7 @@ class VideoDetailPageV extends StatefulWidget {
 }
 
 class _VideoDetailPageVState extends State<VideoDetailPageV>
-    with
-        TickerProviderStateMixin,
-        RouteAware,
-        RouteAwareMixin,
-        WidgetsBindingObserver {
+    with RouteAware, RouteAwareMixin, WidgetsBindingObserver {
   final heroTag = Get.arguments['heroTag'];
 
   late final VideoDetailController videoDetailController;
@@ -189,11 +185,6 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final isResume = state == .resumed;
     final ctr = videoDetailController.plPlayerController..visible = isResume;
     if (isResume) {
-      // TODO: remove
-      // part of https://github.com/flutter/flutter/issues/186723
-      if (Platform.isAndroid && !showSystemBar_) {
-        setEnabledSystemUIMode(.immersiveSticky);
-      }
       if (!ctr.showDanmaku) {
         introController.startTimer();
         ctr.showDanmaku = true;
@@ -644,7 +635,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                                           Text(
                                             '${videoDetailController.playedTime == null
                                                 ? '立即'
-                                                : plPlayerController!.playerStatus.isCompleted
+                                                : plPlayerController!.isCompleted
                                                 ? '重新'
                                                 : '继续'}播放',
                                             style: TextStyle(
@@ -702,13 +693,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                               : Positioned.fill(
                                   bottom: -2,
                                   child: GestureDetector(
-                                    onTap: () async {
+                                    onTap: () {
                                       if (!videoDetailController.isFileSource) {
                                         if (videoDetailController.isQuerying) {
                                           if (kDebugMode) {
-                                            debugPrint(
-                                              'handlePlay: querying',
-                                            );
+                                            debugPrint('handlePlay: querying');
                                           }
                                           return;
                                         }
@@ -732,21 +721,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                                               null) {
                                         handlePlay();
                                       } else {
-                                        if (plPlayerController!
-                                            .videoPlayerController!
-                                            .state
-                                            .completed) {
-                                          await plPlayerController!
-                                              .videoPlayerController!
-                                              .seek(Duration.zero);
-                                          plPlayerController!
-                                              .videoPlayerController!
-                                              .play();
-                                        } else {
-                                          plPlayerController!
-                                              .videoPlayerController!
-                                              .playOrPause();
-                                        }
+                                        plPlayerController!.onDoubleTapCenter();
                                       }
                                     },
                                     behavior: HitTestBehavior.opaque,
@@ -1198,12 +1173,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
             child: IconButton(
               tooltip: '播放',
               onPressed: handlePlay,
-              icon: Image.asset(
-                Assets.play,
-                width: 60,
-                height: 60,
-                cacheHeight: 60.cacheSize(context),
-              ),
+              icon: const PlayIcon(),
             ),
           ),
         ],
@@ -1365,7 +1335,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     if (videoDetailController.tabCtr.length != tabs.length) {
       videoDetailController.tabCtr.dispose();
       videoDetailController.tabCtr = TabController(
-        vsync: this,
+        vsync: videoDetailController,
         length: tabs.length,
         initialIndex: tabs.isEmpty
             ? 0
@@ -1619,9 +1589,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                             return FilledButton.tonal(
                               style: FilledButton.styleFrom(
                                 shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(6),
-                                  ),
+                                  borderRadius: .all(.circular(6)),
                                 ),
                                 backgroundColor: themeData
                                     .colorScheme
@@ -1639,9 +1607,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                                   item,
                                   isStein: true,
                                 );
-                                videoDetailController.getSteinEdgeInfo(
-                                  item.id,
-                                );
+                                videoDetailController.getSteinEdgeInfo(item.id);
                               },
                               child: Text(item.option!),
                             );
@@ -1996,15 +1962,12 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       },
     );
     if (isFullScreen || videoDetailController.showVideoSheet) {
+      final child = listSheetContent(enableSlide: false);
       PageUtils.showVideoBottomSheet(
         context,
-        isFullScreen: () => isFullScreen,
         child: videoDetailController.plPlayerController.darkVideoPage
-            ? Theme(
-                data: themeData,
-                child: listSheetContent(enableSlide: false),
-              )
-            : listSheetContent(enableSlide: false),
+            ? Theme(data: themeData, child: child)
+            : child,
       );
     } else {
       videoDetailController.childKey.currentState?.showBottomSheet(
@@ -2076,23 +2039,16 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   void showViewPoints() {
     if (isFullScreen || videoDetailController.showVideoSheet) {
+      final child = ViewPointsPage(
+        enableSlide: false,
+        videoDetailController: videoDetailController,
+        plPlayerController: plPlayerController,
+      );
       PageUtils.showVideoBottomSheet(
         context,
-        isFullScreen: () => isFullScreen,
         child: videoDetailController.plPlayerController.darkVideoPage
-            ? Theme(
-                data: themeData,
-                child: ViewPointsPage(
-                  enableSlide: false,
-                  videoDetailController: videoDetailController,
-                  plPlayerController: plPlayerController,
-                ),
-              )
-            : ViewPointsPage(
-                enableSlide: false,
-                videoDetailController: videoDetailController,
-                plPlayerController: plPlayerController,
-              ),
+            ? Theme(data: themeData, child: child)
+            : child,
       );
     } else {
       videoDetailController.childKey.currentState?.showBottomSheet(

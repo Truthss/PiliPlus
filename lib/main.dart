@@ -100,13 +100,15 @@ void main() async {
     exit(0);
   }
   ScaledWidgetsFlutterBinding.instance.scaleFactor = Pref.uiScale;
-  await Future.wait([_initDownPath(), _initTmpPath()]);
+  await Future.wait([
+    _initDownPath(),
+    _initTmpPath(),
+    CacheManager.ensureInitialized(),
+  ]);
   Get
     ..lazyPut(AccountService.new)
     ..lazyPut(DownloadService.new);
   HttpOverrides.global = _CustomHttpOverrides();
-
-  CacheManager.autoClearCache();
 
   if (PlatformUtils.isMobile) {
     if (Platform.isAndroid) MaxScreenSize.init();
@@ -133,7 +135,7 @@ void main() async {
   SmartDialog.config.toast = SmartConfigToast(displayType: .onlyRefresh);
 
   if (PlatformUtils.isMobile) {
-    setEnabledSystemUIMode(.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         systemNavigationBarColor: Colors.transparent,
@@ -274,8 +276,11 @@ class MyApp extends StatelessWidget {
       getPages: Routes.getPages,
       defaultTransition: Pref.pageTransition,
       builder: FlutterSmartDialog.init(
-        toastBuilder: (msg) => CustomToast(msg: msg),
-        loadingBuilder: (msg) => LoadingWidget(msg: msg),
+        toastBuilder: CustomToast.new,
+        loadingBuilder: LoadingWidget.new,
+        notifyStyle: const FlutterSmartNotifyStyle(
+          warningBuilder: NotifyWarning.new,
+        ),
         builder: _builder,
       ),
       navigatorObservers: [
