@@ -181,13 +181,18 @@ class PlPlayerController with BlockConfigMixin {
   final RxBool isBuffering = true.obs;
 
   /// 全屏方向
+  // ignore: unnecessary_getters_setters
   bool get isVertical => _isVertical;
 
+  set isVertical(bool value) {
+    _isVertical = value;
+  }
+
   /// 弹幕开关
-  late final RxBool _enableShowDanmaku = Pref.enableShowDanmaku.obs;
-  late final RxBool _enableShowLiveDanmaku = Pref.enableShowLiveDanmaku.obs;
-  RxBool get enableShowDanmaku =>
-      isLive ? _enableShowLiveDanmaku : _enableShowDanmaku;
+  late final RxBool enableShowDanmaku = Pref.enableShowDanmaku.obs;
+  late final RxBool enableShowLiveDanmaku = Pref.enableShowLiveDanmaku.obs;
+  RxBool get enableShowDanmakuAdaptive =>
+      isLive ? enableShowLiveDanmaku : enableShowDanmaku;
 
   late final bool autoPiP = Pref.autoPiP;
   bool get isPipMode =>

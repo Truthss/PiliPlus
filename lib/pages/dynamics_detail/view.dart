@@ -72,7 +72,12 @@ class _DynamicDetailPageState
     // ).whenComplete(_stopRefresh);
   }
 
-  late final AnimationController _refreshController;
+  AnimationController? refreshController;
+  AnimationController get _refreshController =>
+      refreshController ??= AnimationController(
+        vsync: this,
+        duration: CircularProgressIndicator.defaultAnimationDuration,
+      );
 
   @override
   dynamic get arguments => {'item': controller.dynItem};
@@ -96,15 +101,11 @@ class _DynamicDetailPageState
       ),
       tag: id,
     );
-    _refreshController = AnimationController(
-      vsync: this,
-      duration: CircularProgressIndicator.defaultAnimationDuration,
-    );
   }
 
   @override
   void dispose() {
-    _refreshController.dispose();
+    refreshController?.dispose();
     super.dispose();
   }
 
@@ -565,9 +566,7 @@ class _DynamicDetailPageState
               color: theme.colorScheme.surface,
               border: Border(
                 top: BorderSide(
-                  color: theme.colorScheme.outline.withValues(
-                    alpha: 0.08,
-                  ),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.08),
                 ),
               ),
             ),
