@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
-import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/scroll_physics.dart' show ReloadMixin;
 import 'package:PiliPlus/http/api.dart';
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/init.dart';
@@ -29,6 +29,7 @@ import 'package:PiliPlus/pages/video/reply/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/android/android_helper.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
@@ -42,9 +43,9 @@ import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class UgcIntroController extends CommonIntroController with ReloadMixin {
   late final RxBool expand;
@@ -283,8 +284,12 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
   @override
   void actionShareVideo(BuildContext context) {
     final videoDetail = this.videoDetail.value;
-    final playedTimePos = videoDetailCtr.playedTimePos;
-    String videoUrl = '${HttpString.baseUrl}/video/$bvid';
+    final cid = this.cid.value;
+    final partIndex = videoDetail.pages?.indexWhere((e) => e.cid == cid);
+    final addIndex = partIndex != null && partIndex > 0;
+    final playedTimePos = videoDetailCtr.playedTimePos(addIndex);
+    final videoUrl =
+        '${HttpString.baseUrl}/video/$bvid/${addIndex ? '?p=${partIndex + 1}' : ''}';
     showDialog(
       context: context,
       builder: (_) => SimpleDialog(
@@ -320,7 +325,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
             ),
             onTap: () {
               Get.back();
-              PageUtils.launchURL(videoUrl);
+              PiliAndroidHelper.openUrl(videoUrl);
             },
           ),
           if (PlatformUtils.isMobile)
@@ -444,7 +449,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
           followStatus
             ..value.attribute = attribute
             ..refresh();
-          Future.delayed(const Duration(milliseconds: 500), queryFollowStatus);
+          Timer(const Duration(milliseconds: 500), queryFollowStatus);
         },
       );
     }
@@ -485,6 +490,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
             cid: cid,
             cover: cover,
             dimension: dimension,
+            title: episode.title,
           );
           return false;
         }

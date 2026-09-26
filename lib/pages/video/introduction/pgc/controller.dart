@@ -20,6 +20,7 @@ import 'package:PiliPlus/pages/dynamics_repost/view.dart';
 import 'package:PiliPlus/pages/video/reply/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/service_locator.dart';
+import 'package:PiliPlus/utils/android/android_helper.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
@@ -29,9 +30,9 @@ import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
+import 'package:material_ui/material_ui.dart';
 
 class PgcIntroController extends CommonIntroController {
   int? seasonId;
@@ -139,7 +140,7 @@ class PgcIntroController extends CommonIntroController {
             child: const Text('其它app打开', style: TextStyle(fontSize: 14)),
             onPressed: () {
               Get.back();
-              PageUtils.launchURL(videoUrl);
+              PiliAndroidHelper.openUrl(videoUrl);
             },
           ),
           if (PlatformUtils.isMobile)
@@ -368,8 +369,6 @@ class PgcIntroController extends CommonIntroController {
       if (nextIndex >= episodes.length) {
         if (playRepeat == PlayRepeat.listCycle) {
           nextIndex = 0;
-        } else if (playRepeat == PlayRepeat.autoPlayRelated) {
-          return false;
         } else {
           return false;
         }
@@ -472,7 +471,7 @@ class PgcIntroController extends CommonIntroController {
         ? await FavHttp.delFavPugv(seasonId!)
         : await FavHttp.addFavPugv(seasonId!);
     if (res.isSuccess) {
-      this.isFav.value = !isFav;
+      this.isFav.toggle();
       SmartDialog.showToast('${isFav ? '取消' : ''}收藏成功');
     } else {
       res.toast();
